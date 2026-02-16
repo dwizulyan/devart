@@ -1,0 +1,22 @@
+{
+  "name": "devart",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx  src/index.ts"
+  },
+  "dependencies": {
+    "@clack/core": "^1.0.1",
+    "@clack/prompts": "^1.0.1",
+    "@hono/node-server": "^1.19.9",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.2.3",
+    "hono": "^4.11.4",
+    "puppeteer": "^24.35.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}
