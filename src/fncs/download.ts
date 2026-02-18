@@ -10,8 +10,11 @@ import type { Deviation } from "../types/deviation.js"
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+import * as cl from "@clack/prompts"
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
 
 
 
@@ -24,7 +27,7 @@ function cutDecimal(num: number, digits: number) {
     return Math.trunc(num * factor) / factor;
 }
 
-async function download(data: Deviation) {
+async function download(data: Deviation, spin: cl.SpinnerResult) {
     try {
         if (!data) {
             throw new Error("no data found");
@@ -52,17 +55,20 @@ async function download(data: Deviation) {
                 const elapsed = (Date.now() - startTime) / 1000;
                 const speed = cutDecimal(mb / elapsed, 2);
 
-                process.stdout.write(
-                    `\rDownloaded: ${displayMb} MB | Speed: ${speed} MB/s`
+                // process.stdout.write(
+                //     `\rDownloaded: ${displayMb} MB | Speed: ${speed} MB/s`
+                // );
+                spin.message(
+                    `${data.title}, Downloaded: ${displayMb} MB | Speed: ${speed} MB/s`
                 );
 
                 cb(null, chunk); // 🔑 WAJIB diteruskan
             }
         });
-        console.log(`Downloading : ${sanitizeFileName(data.deviationid)} (${cutDecimal(size, 2)} Mb)`)
-        const downloadPath = path.join(`C:\\collection`, `${sanitizeFileName(data.deviationid)}.${fileExt}`)
+        // console.log(`Downloading : ${sanitizeFileName(data.deviationid)} (${cutDecimal(size, 2)} Mb)`)
+        spin.message(`Downloading ${data.title} : ${data.deviationid} (${cutDecimal(size, 2)} Mb)`)
+        const downloadPath = path.join(`C:\\collection`, `${data.deviationid}.${fileExt}`)
         await pipeline(Readable.fromWeb(get.body as ReadableStream), progressStream, createWriteStream(downloadPath))
-        console.log("\nDone...")
     }
     catch (err) {
         console.log(err)
@@ -70,10 +76,13 @@ async function download(data: Deviation) {
 }
 
 async function batch(user: string) {
-    const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(__dirname, `./data/${user}.txt`), { encoding: "utf-8" }))
+    const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(__dirname, `../data/${user}.txt`), { encoding: "utf-8" }))
+    const spin = cl.spinner();
 
+    spin.start(`Downloading ${user}'s gallery`)
     for (let img of imgs.deviations) {
-        await download(img)
+        await download(img, spin)
     }
+    spin.stop(`Done`)
 }
 export { batch }

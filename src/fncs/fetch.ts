@@ -1,8 +1,11 @@
 import { readFile, writeFile } from "fs/promises"
-import path from "path"
+import path, { resolve } from "path"
 import type { AuthReponse, Unsuccessfull } from "../types/auth.js";
 import type { GalleryErrorResponse, GalleryResponse } from "../types/deviation.js";
 import type { Deviation } from "../types/deviation.js";
+
+import * as cl from "@clack/prompts"
+
 
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -15,15 +18,14 @@ import { isAuthResponse, isGalleryResponse } from "../utils/type-guard.js";
 
 
 const url = "https://www.deviantart.com/api/v1/oauth2/gallery/all"
-async function get() {
+async function get(user: string) {
     try {
-        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "./data/code.txt"), { encoding: "utf-8" }))
+        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "../data/code.txt"), { encoding: "utf-8" }))
         if (!isAuthResponse(auth)) {
             throw new Error("Error while fetching data")
         }
         const limit = 24;
-        console.log("Fetching....")
-        const req = await fetch(`${url}?username=kilugirl&limit=${limit}`, {
+        const req = await fetch(`${url}?username=${user}&limit=${limit}`, {
             headers: {
                 "Authorization": `Bearer ${auth.res.access_token}`
             }
@@ -32,11 +34,9 @@ async function get() {
             throw new Error(req.statusText);
         }
         const res = await req.json();
-        console.log(`Fetched : ${res.results.length} Images, Total : ${res.results.length}`)
         return res
     }
     catch (err) {
-        console.log(err instanceof Error ? err.message : "Unknown Error");
     }
 }
 
@@ -46,11 +46,13 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 async function getDeviations(user: string) {
     try {
+        const spin = cl.spinner();
+        spin.start("Fetching images by " + user)
         const limit = 24;
         const result: Deviation[] = [];
-        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "./data/code.txt"), { encoding: "utf-8" }));
+        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "../data/code.txt"), { encoding: "utf-8" }));
 
-        let imgs: GalleryResponse | GalleryErrorResponse = await get();
+        let imgs: GalleryResponse | GalleryErrorResponse = await get(user);
 
 
         if (!isGalleryResponse(imgs)) {
@@ -60,9 +62,9 @@ async function getDeviations(user: string) {
             result.push(item);
         }
 
+        spin.message(`Fetched ${result.length} images`)
         while (isGalleryResponse(imgs) && imgs.has_more) {
-            await sleep(2500);
-
+            await sleep(1000);
             const req: Response = await fetch(
                 `${url}?username=${user}&limit=${limit}&offset=${imgs.next_offset}`,
                 {
@@ -82,15 +84,40 @@ async function getDeviations(user: string) {
             for (const item of imgs.results) {
                 result.push(item);
             }
-            console.log(`Fetched : ${imgs.results.length > 0 ? `${imgs.results.length} Images` : "Done"}, Total : ${result.length}`)
+
+            spin.message(`Fetched ${result.length} images`)
         }
-        await writeFile(path.join(__dirname, `./ data / ${user}.txt`), JSON.stringify({ user: user, deviatins: result }))
+        spin.stop(`Fetched : ${result.length} images`)
+        cl.tasks([
+            {
+                title: `Writing fetched data`,
+                task: async (message) => {
+                    try {
+                        message("Writing fetched data")
+                        new Promise<void>((resolve) => {
+                            setTimeout(async () => {
+                                await writeFile(path.join(__dirname, `../data/${user}.txt`), JSON.stringify({ user: user, deviations: result }))
+                                resolve()
+                            }, 1000);
+                        })
+                        return "Successfully writing data"
+                    }
+                    catch (err) {
+                        return err instanceof Error ? err.message : "Unknown Error"
+                    }
+                }
+            }
+            , {
+                title: "Downloading Data",
+                task: async (message) => {
+
+                }
+            }
+        ])
         return result.flat();
 
     } catch (err) {
-        if (err instanceof Error) {
-            console.log(err.message);
-        }
+        throw err
     }
 }
 export { getDeviations }
