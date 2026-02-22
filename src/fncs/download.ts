@@ -1,7 +1,7 @@
 import { createWriteStream, } from "fs"
 import { pipeline } from "stream/promises"
 import path from "path"
-import { readFile } from "fs/promises"
+import { mkdir, readFile } from "fs/promises"
 
 import { Readable, Transform } from "stream"
 import { type ReadableStream, } from "stream/web"
@@ -9,6 +9,8 @@ import type { Deviation } from "../types/deviation.js"
 
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { access } from "fs/promises"
+import config from "../../config.json" with {type: "json"}
 
 import * as cl from "@clack/prompts"
 
@@ -27,7 +29,7 @@ function cutDecimal(num: number, digits: number) {
     return Math.trunc(num * factor) / factor;
 }
 
-async function download(data: Deviation, spin: cl.SpinnerResult) {
+async function download(data: Deviation, spin: cl.SpinnerResult, user: string) {
     try {
         if (!data) {
             throw new Error("no data found");
@@ -67,7 +69,7 @@ async function download(data: Deviation, spin: cl.SpinnerResult) {
         });
         // console.log(`Downloading : ${sanitizeFileName(data.deviationid)} (${cutDecimal(size, 2)} Mb)`)
         spin.message(`Downloading ${data.title} : ${data.deviationid} (${cutDecimal(size, 2)} Mb)`)
-        const downloadPath = path.join(`C:\\collection`, `${data.deviationid}.${fileExt}`)
+        const downloadPath = path.join(`${config.downloadLocation}`, `${user}`, `${data.deviationid}.${fileExt}`)
         await pipeline(Readable.fromWeb(get.body as ReadableStream), progressStream, createWriteStream(downloadPath))
     }
     catch (err) {
@@ -76,12 +78,21 @@ async function download(data: Deviation, spin: cl.SpinnerResult) {
 }
 
 async function batch(user: string) {
-    const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(__dirname, `../data/${user}.txt`), { encoding: "utf-8" }))
+    const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(config.dbLocation, `${user}.txt`), { encoding: "utf-8" }))
     const spin = cl.spinner();
+    try {
+        spin.message(`Checking dir : ${path.join(config.downloadLocation, user)}`)
+        await access(path.join(config.downloadLocation, user))
+    }
+    catch (err) {
+        spin.message("Directory doesn't exist")
+        spin.message("Creating directory")
+        await mkdir(path.join(config.downloadLocation, user))
+    }
 
     spin.start(`Downloading ${user}'s gallery`)
     for (let img of imgs.deviations) {
-        await download(img, spin)
+        await download(img, spin, user)
     }
     spin.stop(`Done`)
 }

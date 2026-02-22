@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 import { isAuthResponse, isGalleryResponse } from "../utils/type-guard.js";
+import { writeData } from "../utils/write-data.js";
 
 
 
@@ -96,10 +97,12 @@ async function getDeviations(user: string) {
                         message("Writing fetched data")
                         new Promise<void>((resolve) => {
                             setTimeout(async () => {
-                                await writeFile(path.join(__dirname, `../data/${user}.txt`), JSON.stringify({ user: user, deviations: result }))
-                                resolve()
                             }, 1000);
                         })
+                        await writeData({ user: user, deviations: result })
+
+                        resolve()
+
                         return "Successfully writing data"
                     }
                     catch (err) {
@@ -107,12 +110,7 @@ async function getDeviations(user: string) {
                     }
                 }
             }
-            , {
-                title: "Downloading Data",
-                task: async (message) => {
 
-                }
-            }
         ])
         return result.flat();
 
