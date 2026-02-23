@@ -32,13 +32,11 @@ app.get("/callback", async (c) => {
         const res = await req.json()
         await writeFile(path.join(config.codeLocation, "code.txt"), JSON.stringify({ res: res }))
         console.log("Done with auth, run this : npm run fetch")
-        return c.text("Done with auth, run this : npm run fetch")
+        return c.text("Done with auth, run this : npm run fetch0")
 
     }
     catch (err) {
-        if (err instanceof Error) {
-            console.log(err)
-        }
+        throw err
     }
 })
 
