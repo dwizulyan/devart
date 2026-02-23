@@ -15,13 +15,16 @@ import { update } from "./update.js";
 import { writeFile } from "fs/promises";
 import { getCode } from "../utils/get-code.js";
 import type { AuthReponse, Unsuccessfull } from "../types/auth.js";
+import { callLogin } from "./call-login.js";
+import { testToken } from "./test-token.js";
+import { resolveTxt } from "dns";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function greetings() {
     try {
-
+        let running = true;
         await cl.tasks([
             {
                 title: `Checking ${config.parentDir}`,
@@ -94,53 +97,83 @@ async function greetings() {
                         return `Successfully creating ${path.join(config.codeLocation)}`
                     }
                 }
+            }, {
+                title: `Checking ${path.join(config.codeLocation, "code.txt")}`,
+                task: async (message) => {
+                    try {
+                        await setTimeout(500)
+                        message(`Checking  ${path.join(config.codeLocation, "code.txt")}`)
+                        await access(path.join(config.codeLocation, "code.txt"))
+                        return `File ${path.join(config.codeLocation, "code.txt")} Exists`
+                    }
+                    catch (err) {
+                        await setTimeout(500)
+                        message("File doesn't exists ")
+                        message(`Creating file ${path.join(config.codeLocation, "code.txt")}`)
+                        await writeFile(path.join(config.codeLocation, "code.txt"), JSON.stringify({ res: null }))
+                        return `Successfully creating ${path.join(config.codeLocation, "code.txt")}`
+                    }
+                }
             }
-
         ])
         // TODO : Create login function.
-        await refreshToken();
-        const chooses = await select({
-            message: "What you wanted to do ?",
-            options: [
-                { value: "login", label: "Login" },
-                { value: "refresh", label: "Refresh Login" },
-                { value: "download", label: "Download Deviations" },
-                { value: "update", label: "Update Downloaded Deviations" },
-            ],
-        })
-        switch (chooses) {
-            case "login":
-                cl.log.info("Logging in...")
-            case "refresh":
-                await text({ message: "Refreshing Login Info...." })
-            case "download":
-                cl.log.info("Starting download menu...")
-                const downloadType = await cl.select({
-                    message: "Which type of download you wanted to do ?",
-                    options: [
-                        { value: "gallery", label: "Users Gallery" },
-                        { value: "single", label: "Single Image" }
-                    ]
-                })
-                switch (downloadType) {
-                    case "gallery":
-                        const userName = await cl.text({
-                            message: "Username of the gallery's owner",
-                            placeholder: "e.g kilugirl"
-                        })
-                        await getDeviations(userName as string);
-                        await setTimeout(500)
-                        await batch(userName as string);
+        const resTestToken = await testToken()
+        if (!resTestToken.success && resTestToken.data != null && resTestToken.next === "refresh") {
+            await refreshToken(resTestToken.data);
+        }
+        while (running) {
+            const chooses = await select({
+                message: "What you wanted to do ?",
+                options: [
+                    { value: "login", label: "Login" },
+                    { value: "refresh", label: "Refresh Login" },
+                    { value: "download", label: "Download Deviations" },
+                    { value: "update", label: "Update Downloaded Deviations" },
+                    { value: "exit", label: "Exit" },
+                ],
+            })
+            switch (chooses) {
+                case "exit":
+                    running = false;
+                    break;
+                case "login":
+                    cl.log.info("Logging in...")
+                    await callLogin()
+                    break
+                case "refresh":
+                    await text({ message: "Refreshing Login Info...." })
+                    break
+                case "download":
+                    cl.log.info("Starting download menu...")
+                    const downloadType = await cl.select({
+                        message: "Which type of download you wanted to do ?",
+                        options: [
+                            { value: "gallery", label: "Users Gallery" },
+                            { value: "single", label: "Single Image" }
+                        ]
+                    })
+                    switch (downloadType) {
+                        case "gallery":
+                            const userName = await cl.text({
+                                message: "Username of the gallery's owner",
+                                placeholder: "e.g kilugirl"
+                            })
+                            await getDeviations(userName as string);
+                            await setTimeout(500)
+                            await batch(userName as string);
 
-                }
+                    }
+                    break;
+                case "update":
+                    cl.log.info("Starting update menu...")
+                    break;
+            }
 
-            case "update":
-                cl.log.info("Starting update menu...")
         }
 
     }
     catch (err) {
-        console.log(err instanceof Error ? err : "Unknown Error")
+        throw err
     }
 }
 export { greetings }
