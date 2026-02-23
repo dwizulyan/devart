@@ -16,12 +16,14 @@ const __dirname = dirname(__filename);
 import { isAuthResponse, isGalleryResponse } from "../utils/type-guard.js";
 import { writeData } from "../utils/write-data.js";
 
+import config from "../../config.json" with {type: "json"}
+
 
 
 const url = "https://www.deviantart.com/api/v1/oauth2/gallery/all"
 async function get(user: string) {
     try {
-        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "../data/code.txt"), { encoding: "utf-8" }))
+        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(config.codeLocation, "code.txt"), { encoding: "utf-8" }))
         if (!isAuthResponse(auth)) {
             throw new Error("Error while fetching data")
         }
@@ -38,6 +40,7 @@ async function get(user: string) {
         return res
     }
     catch (err) {
+        throw err
     }
 }
 
@@ -51,7 +54,7 @@ async function getDeviations(user: string) {
         spin.start("Fetching images by " + user)
         const limit = 24;
         const result: Deviation[] = [];
-        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(__dirname, "../data/code.txt"), { encoding: "utf-8" }));
+        const auth: AuthReponse | Unsuccessfull = JSON.parse(await readFile(path.join(config.codeLocation, "code.txt"), { encoding: "utf-8" }));
 
         let imgs: GalleryResponse | GalleryErrorResponse = await get(user);
 
