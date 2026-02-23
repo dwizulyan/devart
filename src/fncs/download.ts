@@ -73,27 +73,32 @@ async function download(data: Deviation, spin: cl.SpinnerResult, user: string) {
         await pipeline(Readable.fromWeb(get.body as ReadableStream), progressStream, createWriteStream(downloadPath))
     }
     catch (err) {
-        console.log(err)
+        throw err
     }
 }
 
 async function batch(user: string) {
-    const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(config.dbLocation, `${user}.txt`), { encoding: "utf-8" }))
-    const spin = cl.spinner();
     try {
-        spin.message(`Checking dir : ${path.join(config.downloadLocation, user)}`)
-        await access(path.join(config.downloadLocation, user))
+        const imgs: { user: string, deviations: Deviation[] } = JSON.parse(await readFile(path.join(config.dbLocation, `${user}.txt`), { encoding: "utf-8" }))
+        const spin = cl.spinner();
+        try {
+            spin.message(`Checking dir : ${path.join(config.downloadLocation, user)}`)
+            await access(path.join(config.downloadLocation, user))
+        }
+        catch (err) {
+            spin.message("Directory doesn't exist")
+            spin.message("Creating directory")
+            await mkdir(path.join(config.downloadLocation, user))
+        }
+
+        spin.start(`Downloading ${user}'s gallery`)
+        for (let img of imgs.deviations) {
+            await download(img, spin, user)
+        }
+        spin.stop(`Done`)
     }
     catch (err) {
-        spin.message("Directory doesn't exist")
-        spin.message("Creating directory")
-        await mkdir(path.join(config.downloadLocation, user))
+        throw err
     }
-
-    spin.start(`Downloading ${user}'s gallery`)
-    for (let img of imgs.deviations) {
-        await download(img, spin, user)
-    }
-    spin.stop(`Done`)
 }
 export { batch }
